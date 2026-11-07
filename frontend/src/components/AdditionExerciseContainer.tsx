@@ -58,6 +58,10 @@ export function AdditionExerciseContainer() {
         }
     }
 
+    function handleAnswerChange() {
+        setIsCorrect(null);
+    }
+
     async function handleNewExercise() {
         if (isLoading || isChecking) {
             return;
@@ -92,6 +96,7 @@ export function AdditionExerciseContainer() {
                 key={exercise.exerciseId}
                 exercise={exercise}
                 onSubmitAnswer={handleSubmitAnswer}
+                onAnswerChange={handleAnswerChange}
                 onNewExercise={handleNewExercise}
                 isCorrect={isCorrect}
                 isChecking={isChecking}

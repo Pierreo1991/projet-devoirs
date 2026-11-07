@@ -1,40 +1,95 @@
+
 import { useState } from "react";
 
-type NavbarProps = { onNavigate: (page: "home" | "addition") => void; };
+type Page = "home" | "addition";
+
+type NavbarProps = {
+    onNavigate: (page: Page) => void;
+};
 
 export function Navbar({ onNavigate }: NavbarProps) {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMathMenuOpen, setIsMathMenuOpen] = useState(false);
 
+    function handleNavigate(page: Page) {
+        onNavigate(page);
+        setIsMenuOpen(false);
+        setIsMathMenuOpen(false);
+    }
+
+    function handleToggleMenu() {
+        setIsMenuOpen((previous) => !previous);
+        setIsMathMenuOpen(false);
+    }
+
     return (
-        <nav className="navbar">
-            <button onClick={() => onNavigate("home")}>
-                Accueil
-            </button>
+        <nav className="site-navbar" aria-label="Navigation principale">
+            <div className="navbar-header">
+                <span className="navbar-brand">
+                    Mon espace
+                </span>
 
-            <div className="dropdown">
                 <button
-                    onClick={() => setIsMathMenuOpen(!isMathMenuOpen)}
-                    aria-expanded={isMathMenuOpen}
-                    aria-haspopup="true"
+                    type="button"
+                    className="navbar-menu-toggle"
+                    aria-label={
+                        isMenuOpen
+                            ? "Fermer le menu"
+                            : "Ouvrir le menu"
+                    }
+                    aria-expanded={isMenuOpen}
+                    aria-controls="navbar-navigation"
+                    onClick={handleToggleMenu}
                 >
-                    Mathématiques
+                    <span aria-hidden="true">
+                        {isMenuOpen ? "✕" : "☰"}
+                    </span>
                 </button>
-
-                {isMathMenuOpen && (
-                    <div className="dropdown-menu">
-                        <button onClick={() => {
-                            onNavigate("addition");
-                            setIsMathMenuOpen(false);
-                        }}>
-                            Additions
-                        </button>
-                    </div>
-                )}
             </div>
 
-            <button disabled>
-                Langues
-            </button>
+            <div
+                id="navbar-navigation"
+                className={`navbar-navigation ${isMenuOpen ? "navbar-navigation-open" : ""}`}
+            >
+                <button
+                    type="button"
+                    className="navbar-link"
+                    onClick={() => handleNavigate("home")}
+                >
+                    Accueil
+                </button>
+
+                <div className="navbar-dropdown">
+                    <button
+                        type="button"
+                        className="navbar-link navbar-dropdown-toggle"
+                        aria-expanded={isMathMenuOpen}
+                        onClick={() => setIsMathMenuOpen((previous) => !previous)}
+                    >
+                        Mathématiques
+                    </button>
+
+                    {isMathMenuOpen && (
+                        <div className="navbar-dropdown-content">
+                            <button
+                                type="button"
+                                className="navbar-link navbar-submenu-link"
+                                onClick={() => handleNavigate("addition")}
+                            >
+                                Additions
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <button
+                    type="button"
+                    className="navbar-link"
+                    disabled
+                >
+                    Langues
+                </button>
+            </div>
         </nav>
     );
 }

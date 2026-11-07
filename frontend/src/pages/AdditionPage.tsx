@@ -5,6 +5,7 @@ import type { AdditionExercise } from "../types/AdditionExercise";
 type AdditionPageProps = {
     exercise: AdditionExercise;
     onSubmitAnswer?: (answer: number) => void;
+    onAnswerChange?: () => void;
     onNewExercise?: () => void;
     isCorrect?: boolean | null;
     isChecking?: boolean;
@@ -13,6 +14,7 @@ type AdditionPageProps = {
 export function AdditionPage({
                                  exercise,
                                  onSubmitAnswer,
+                                 onAnswerChange,
                                  onNewExercise,
                                  isCorrect = null,
                                  isChecking = false,
@@ -31,54 +33,95 @@ export function AdditionPage({
 
     return (
         <main className="addition-page">
-            <h1>Les additions</h1>
-            <p>Trouve la bonne réponse!</p>
+            <section className="addition-card">
+                <div className="addition-header">
+                    <span className="addition-category">
+                        Mathématiques · Additions
+                    </span>
 
-            <h2>
-                {exercise.firstOperand} + {exercise.secondOperand} = ?
-            </h2>
-
-            <form onSubmit={handleSubmit}>
-                <label htmlFor="addition-answer">
-                    Ta réponse
-                </label>
-
-                <input
-                    id="addition-answer"
-                    type="number"
-                    step="1"
-                    value={answer}
-                    disabled={isChecking || isCorrect === true}
-                    onChange={(event) => setAnswer(event.target.value)}
-                />
-
-                <button
-                    type="submit"
-                    disabled={
-                        answer.trim() === "" ||
-                        isChecking ||
-                        isCorrect === true
-                    }
-                >
-                    {isChecking ? "Vérification..." : "Vérifier"}
-                </button>
-            </form>
-
-            {isCorrect === true && (
-                <div>
-                    <p role="status">Bravo! Bonne réponse!</p>
-                    <button
-                        type="button"
-                        onClick={onNewExercise}
-                    >
-                        Nouvelle addition
-                    </button>
+                    <h1>À toi de jouer!</h1>
+                    <p>Combien font ces deux nombres?</p>
                 </div>
-            )}
 
-            {isCorrect === false && (
-                <p role="status">Essaie encore!</p>
-            )}
+                <div
+                    className="addition-equation"
+                    role="group"
+                    aria-label={`${exercise.firstOperand} + ${exercise.secondOperand} = ?`}
+                >
+                    <span className="addition-number addition-number-first">
+                        {exercise.firstOperand}
+                    </span>
+
+                    <span className="addition-operator">+</span>
+
+                    <span className="addition-number addition-number-second">
+                        {exercise.secondOperand}
+                    </span>
+
+                    <span className="addition-operator">= ?</span>
+                </div>
+
+                {isCorrect !== true && (
+                    <form className="addition-form" onSubmit={handleSubmit}>
+                        <label htmlFor="addition-answer">
+                            Ta réponse
+                        </label>
+
+                        <input
+                            id="addition-answer"
+                            type="number"
+                            step="1"
+                            value={answer}
+                            disabled={isChecking}
+                            onChange={(event) => {
+                                setAnswer(event.target.value);
+                                onAnswerChange?.();
+                            }}
+                        />
+
+                        <button
+                            type="submit"
+                            disabled={answer.trim() === "" || isChecking}
+                        >
+                            {isChecking ? "Vérification..." : "Vérifier"}
+                        </button>
+                    </form>
+                )}
+
+                {isCorrect === true && (
+                    <div className="addition-feedback addition-feedback-success">
+                        <div className="addition-feedback-message">
+                            <span className="addition-feedback-icon" aria-hidden="true">
+                                🎉
+                            </span>
+
+                            <div className="addition-feedback-text">
+                                <p role="status">Bravo! Bonne réponse!</p>
+                                <span>Tu as trouvé la bonne réponse!</span>
+                            </div>
+                        </div>
+
+                        <button type="button" onClick={onNewExercise}>
+                            Nouvelle addition
+                        </button>
+                    </div>
+                )}
+
+                {isCorrect === false && (
+                    <div className="addition-feedback addition-feedback-error">
+                        <div className="addition-feedback-message">
+                            <span className="addition-feedback-icon" aria-hidden="true">
+                                💡
+                            </span>
+
+                            <div className="addition-feedback-text">
+                                <p role="status">Essaie encore!</p>
+                                <span>Tu peux y arriver, prends ton temps!</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </section>
         </main>
     );
 }
