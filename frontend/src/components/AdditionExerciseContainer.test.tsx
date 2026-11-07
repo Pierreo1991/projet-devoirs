@@ -10,6 +10,12 @@ vi.mock("../services/additionApi", () => ({
     checkAdditionAnswer: vi.fn(),
 }));
 
+async function findAddition(firstOperand: number, secondOperand: number) {
+    return screen.findByRole("group", {
+        name: `${firstOperand} + ${secondOperand} = ?`,
+    });
+}
+
 test("givenGeneratedExercise_whenLoadingPage_thenDisplaysAddition", async () => {
     // Arrange
     const exercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
@@ -21,7 +27,7 @@ test("givenGeneratedExercise_whenLoadingPage_thenDisplaysAddition", async () => 
     render(<AdditionExerciseContainer />);
 
     // Assert
-    expect(await screen.findByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(await findAddition(3, 8)).toBeInTheDocument();
 });
 
 test("givenCorrectAnswer_whenSubmitting_thenDisplaysSuccessFeedback", async () => {
@@ -37,7 +43,7 @@ test("givenCorrectAnswer_whenSubmitting_thenDisplaysSuccessFeedback", async () =
     render(<AdditionExerciseContainer />);
 
     // Wait for exercise loading
-    expect(await screen.findByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(await findAddition(3, 8)).toBeInTheDocument();
 
     // Act
     await user.type(screen.getByRole("spinbutton"), "11");
@@ -63,7 +69,7 @@ test("givenCorrectAnswer_whenRequestingNewExercise_thenDisplaysNewAddition", asy
 
     render(<AdditionExerciseContainer />);
 
-    expect(await screen.findByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(await findAddition(3, 8)).toBeInTheDocument();
 
     await user.type(screen.getByRole("spinbutton"), "11");
     await user.click(screen.getByRole("button", { name: "Vérifier" }));
@@ -74,7 +80,7 @@ test("givenCorrectAnswer_whenRequestingNewExercise_thenDisplaysNewAddition", asy
     await user.click(screen.getByRole("button", { name: "Nouvelle addition" }));
 
     // Assert
-    expect(await screen.findByText("6 + 2 = ?")).toBeInTheDocument();
+    expect(await findAddition(6, 2)).toBeInTheDocument();
     expect(createAdditionExercise).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("Bravo! Bonne réponse!")).not.toBeInTheDocument();
     expect(screen.getByRole("spinbutton")).toHaveValue(null);
@@ -92,7 +98,7 @@ test("givenIncorrectAnswer_whenRetryingWithCorrectAnswer_thenDisplaysSuccess", a
         .mockResolvedValueOnce(true);
 
     render(<AdditionExerciseContainer />);
-    expect(await screen.findByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(await findAddition(3, 8)).toBeInTheDocument();
 
     // Act - Première tentative incorrecte
     await user.type(screen.getByRole("spinbutton"), "10");
@@ -100,7 +106,7 @@ test("givenIncorrectAnswer_whenRetryingWithCorrectAnswer_thenDisplaysSuccess", a
 
     // Assert - Peut réessayer
     expect(await screen.findByText("Essaie encore!")).toBeInTheDocument();
-    expect(screen.getByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "3 + 8 = ?" })).toBeInTheDocument();
     expect(screen.getByRole("spinbutton")).toBeEnabled();
 
     // Act - Deuxième tentative correcte
@@ -129,7 +135,7 @@ test("givenVerificationError_whenRetrying_thenCanSubmitAnswerAgain", async () =>
 
     render(<AdditionExerciseContainer />);
 
-    expect(await screen.findByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(await findAddition(3, 8)).toBeInTheDocument();
 
     // Act - Première tentative : erreur technique
     await user.type(screen.getByRole("spinbutton"), "11");
@@ -167,7 +173,7 @@ test("givenNewExerciseLoadingError_whenRetrying_thenDisplaysNewAddition", async 
 
     render(<AdditionExerciseContainer />);
 
-    expect(await screen.findByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(await findAddition(3, 8)).toBeInTheDocument();
 
     await user.type(screen.getByRole("spinbutton"), "11");
     await user.click(screen.getByRole("button", { name: "Vérifier" }));
@@ -179,16 +185,48 @@ test("givenNewExerciseLoadingError_whenRetrying_thenDisplaysNewAddition", async 
 
     // Assert - L'ancien exercice reste accessible
     expect(await screen.findByRole("alert")).toHaveTextContent("Impossible de charger un nouvel exercice.");
-    expect(screen.getByText("3 + 8 = ?")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "3 + 8 = ?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Nouvelle addition" })).toBeEnabled();
 
     // Act - Nouvelle tentative
     await user.click(screen.getByRole("button", { name: "Nouvelle addition" }));
 
     // Assert - Le nouvel exercice est affiché
-    expect(await screen.findByText("6 + 2 = ?")).toBeInTheDocument();
+    expect(await findAddition(6, 2)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText("Bravo! Bonne réponse!")).not.toBeInTheDocument();
     expect(screen.getByRole("spinbutton")).toHaveValue(null);
     expect(createAdditionExercise).toHaveBeenCalledTimes(3);
+});
+
+test("givenIncorrectAnswer_whenEditingAnswer_thenClearsFeedback", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const exercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+
+    vi.mocked(createAdditionExercise)
+        .mockResolvedValue(exercise);
+    vi.mocked(checkAdditionAnswer)
+        .mockResolvedValue(false);
+
+    render(<AdditionExerciseContainer />);
+
+    expect(await screen.findByRole("group", { name: "3 + 8 = ?" })).toBeInTheDocument();
+
+    // Act - Première tentative incorrecte
+    await user.type(screen.getByRole("spinbutton"), "10");
+    await user.click(screen.getByRole("button", { name: "Vérifier" }));
+
+    // Assert - Rétroaction affichée
+    expect(await screen.findByText("Essaie encore!")).toBeInTheDocument();
+
+    // Act - L'enfant commence à corriger sa réponse
+    await user.clear(screen.getByRole("spinbutton"));
+
+    // Assert - La rétroaction disparaît
+    expect(screen.queryByText("Essaie encore!")).not.toBeInTheDocument();
+
+    // L'exercice n'a pas changé
+    expect(screen.getByRole("group", { name: "3 + 8 = ?" })).toBeInTheDocument();
+    expect(createAdditionExercise).toHaveBeenCalledTimes(1);
 });
