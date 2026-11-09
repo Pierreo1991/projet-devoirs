@@ -1,9 +1,14 @@
 import type { AdditionExercise } from "../types/AdditionExercise";
+import type { AdditionDifficulty } from "../types/AdditionDifficulty";
 
-export async function createAdditionExercise(): Promise<AdditionExercise> {
-    const response = await fetch("/api/additions", {
-        method: "POST",
-    });
+export async function createAdditionExercise(
+    difficulty?: AdditionDifficulty
+): Promise<AdditionExercise> {
+    const url = difficulty
+        ? `/api/additions?difficulty=${difficulty}`
+        : "/api/additions";
+
+    const response = await fetch(url, {method: "POST",});
 
     if (!response.ok) {
         throw new Error("Failed to create addition exercise");

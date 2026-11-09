@@ -1,6 +1,7 @@
 package com.pierreo.projet_devoir_po.application.addition;
 
 import com.pierreo.projet_devoir_po.application.addition.exception.AdditionExerciseNotFoundException;
+import com.pierreo.projet_devoir_po.domain.addition.AdditionDifficulty;
 import com.pierreo.projet_devoir_po.domain.addition.AdditionExercise;
 import com.pierreo.projet_devoir_po.domain.addition.AdditionExerciseGenerator;
 import com.pierreo.projet_devoir_po.domain.addition.AdditionExerciseRepository;
@@ -22,7 +23,7 @@ public class AdditionExerciseServiceTest {
 
         AdditionExercise exercise = new AdditionExercise(3, 8);
 
-        when(generator.generate()).thenReturn(exercise);
+        when(generator.generate(AdditionDifficulty.EASY)).thenReturn(exercise);
 
         AdditionExerciseService service = new AdditionExerciseService(generator, repository);
 
@@ -34,7 +35,7 @@ public class AdditionExerciseServiceTest {
         assertEquals(3, result.firstOperand());
         assertEquals(8, result.secondOperand());
 
-        verify(generator).generate();
+        verify(generator).generate(AdditionDifficulty.EASY);
         verify(repository).save(eq(result.exerciseId()), same(exercise));
     }
 
@@ -96,5 +97,29 @@ public class AdditionExerciseServiceTest {
         assertThrows(AdditionExerciseNotFoundException.class, () -> service.checkAnswer(exerciseId, 11));
 
         verify(repository).findById(exerciseId);
+    }
+
+    @Test
+    void givenMediumDifficulty_whenCreatingExercise_thenSavesAndReturnsMediumExercise() {
+        // Arrange
+        AdditionExerciseGenerator generator = mock(AdditionExerciseGenerator.class);
+        AdditionExerciseRepository repository = mock(AdditionExerciseRepository.class);
+
+        AdditionExercise exercise = new AdditionExercise(25, 100);
+
+        when(generator.generate(AdditionDifficulty.MEDIUM)).thenReturn(exercise);
+
+        AdditionExerciseService service = new AdditionExerciseService(generator, repository);
+
+        // Act
+        CreatedAdditionExercise result = service.createExercise(AdditionDifficulty.MEDIUM);
+
+        // Assert
+        assertNotNull(result.exerciseId());
+        assertEquals(25, result.firstOperand());
+        assertEquals(100, result.secondOperand());
+
+        verify(generator).generate(AdditionDifficulty.MEDIUM);
+        verify(repository).save(eq(result.exerciseId()), same(exercise));
     }
 }

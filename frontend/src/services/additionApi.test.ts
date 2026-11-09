@@ -129,3 +129,23 @@ test("givenFailedApiResponse_whenCheckingAnswer_thenThrowsError", async () => {
         }
     );
 });
+
+test("givenMediumDifficulty_whenCreatingExercise_thenSendsDifficultyToApi", async () => {
+    // Arrange
+    const exercise = {exerciseId: "123", firstOperand: 25, secondOperand: 100,};
+
+    const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => exercise,
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Act
+    const result = await createAdditionExercise("MEDIUM");
+
+    // Assert
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/api/additions?difficulty=MEDIUM", { method: "POST" });
+
+    expect(result).toEqual(exercise);
+});

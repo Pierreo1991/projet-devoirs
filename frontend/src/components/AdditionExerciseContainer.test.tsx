@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { AdditionExerciseContainer } from "./AdditionExerciseContainer";
@@ -229,4 +229,228 @@ test("givenIncorrectAnswer_whenEditingAnswer_thenClearsFeedback", async () => {
     // L'exercice n'a pas changé
     expect(screen.getByRole("group", { name: "3 + 8 = ?" })).toBeInTheDocument();
     expect(createAdditionExercise).toHaveBeenCalledTimes(1);
+});
+
+test("givenDefaultDifficulty_whenLoadingPage_thenRequestsEasyExercise", async () => {
+    // Arrange
+    const exercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+
+    vi.mocked(createAdditionExercise).mockResolvedValue(exercise);
+
+    // Act
+    render(<AdditionExerciseContainer />);
+
+    // Assert
+    expect(await findAddition(3, 8)).toBeInTheDocument();
+    expect(createAdditionExercise).toHaveBeenCalledExactlyOnceWith("EASY");
+});
+
+test("givenEasyExercise_whenSelectingMediumDifficulty_thenLoadsMediumExercise", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const easyExercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+    const mediumExercise = {exerciseId: "456", firstOperand: 25, secondOperand: 68,};
+
+    vi.mocked(createAdditionExercise)
+        .mockResolvedValueOnce(easyExercise)
+        .mockResolvedValueOnce(mediumExercise);
+
+    render(<AdditionExerciseContainer />);
+
+    expect(await findAddition(3, 8)).toBeInTheDocument();
+
+    // Act
+    await user.click(screen.getByRole("button", { name: "100" }));
+
+    // Assert
+    expect(await findAddition(25, 68)).toBeInTheDocument();
+    expect(createAdditionExercise).toHaveBeenNthCalledWith(1, "EASY");
+    expect(createAdditionExercise).toHaveBeenNthCalledWith(2, "MEDIUM");
+    expect(screen.getByRole("button", { name: "100" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("givenMediumDifficulty_whenRequestingNewExercise_thenKeepsMediumDifficulty", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const easyExercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+    const firstMediumExercise = {exerciseId: "456", firstOperand: 25, secondOperand: 68,};
+    const secondMediumExercise = {exerciseId: "789", firstOperand: 40, secondOperand: 50,};
+
+    vi.mocked(createAdditionExercise)
+        .mockResolvedValueOnce(easyExercise)
+        .mockResolvedValueOnce(firstMediumExercise)
+        .mockResolvedValueOnce(secondMediumExercise);
+
+    vi.mocked(checkAdditionAnswer).mockResolvedValue(true);
+
+    render(<AdditionExerciseContainer />);
+
+    expect(await findAddition(3, 8)).toBeInTheDocument();
+
+    // Act - Sélectionner MEDIUM
+    await user.click(screen.getByRole("button", { name: "100" }));
+    expect(await findAddition(25, 68)).toBeInTheDocument();
+
+    // Act - Répondre correctement
+    await user.type(screen.getByRole("spinbutton"), "93");
+    await user.click(screen.getByRole("button", { name: "Vérifier" }));
+
+    expect(await screen.findByText("Bravo! Bonne réponse!")).toBeInTheDocument();
+
+    // Act - Demander une nouvelle addition
+    await user.click(screen.getByRole("button", { name: "Nouvelle addition" }));
+
+    // Assert
+    expect(await findAddition(40, 50)).toBeInTheDocument();
+
+    expect(createAdditionExercise).toHaveBeenNthCalledWith(1, "EASY");
+    expect(createAdditionExercise).toHaveBeenNthCalledWith(2, "MEDIUM");
+    expect(createAdditionExercise).toHaveBeenNthCalledWith(3, "MEDIUM");
+
+    expect(screen.getByRole("button", { name: "100" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("givenIncorrectAnswer_whenChangingDifficulty_thenResetsAnswerAndFeedback", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const easyExercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+    const mediumExercise = {exerciseId: "456", firstOperand: 25, secondOperand: 68,};
+
+    vi.mocked(createAdditionExercise)
+        .mockResolvedValueOnce(easyExercise)
+        .mockResolvedValueOnce(mediumExercise);
+
+    vi.mocked(checkAdditionAnswer).mockResolvedValue(false);
+
+    render(<AdditionExerciseContainer />);
+
+    expect(await findAddition(3, 8)).toBeInTheDocument();
+
+    // Act - Soumettre une mauvaise réponse
+    await user.type(screen.getByRole("spinbutton"), "10");
+    await user.click(screen.getByRole("button", { name: "Vérifier" }));
+
+    expect(await screen.findByText("Essaie encore!")).toBeInTheDocument();
+
+    // Act - Changer de difficulté
+    await user.click(screen.getByRole("button", { name: "100" }));
+
+    // Assert
+    expect(await findAddition(25, 68)).toBeInTheDocument();
+    expect(screen.queryByText("Essaie encore!")).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton")).toHaveValue(null);
+    expect(createAdditionExercise).toHaveBeenNthCalledWith(2, "MEDIUM");
+});
+
+test("givenPendingMediumRequest_whenHardResponseArrivesFirst_thenKeepsHardExercise", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const easyExercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+    const mediumExercise = {exerciseId: "456", firstOperand: 25, secondOperand: 68,};
+    const hardExercise = {exerciseId: "789", firstOperand: 425, secondOperand: 368,};
+
+    let resolveMedium!: (exercise: typeof mediumExercise) => void;
+    let resolveHard!: (exercise: typeof hardExercise) => void;
+
+    const mediumPromise = new Promise<typeof mediumExercise>((resolve) => {
+        resolveMedium = resolve;
+    });
+
+    const hardPromise = new Promise<typeof hardExercise>((resolve) => {
+        resolveHard = resolve;
+    });
+
+    vi.mocked(createAdditionExercise)
+        .mockResolvedValueOnce(easyExercise)
+        .mockReturnValueOnce(mediumPromise)
+        .mockReturnValueOnce(hardPromise);
+
+    render(<AdditionExerciseContainer />);
+
+    expect(await findAddition(3, 8)).toBeInTheDocument();
+
+    // Act - Sélectionner MEDIUM, sans résoudre la requête
+    await user.click(screen.getByRole("button", { name: "100" }));
+
+    await waitFor(() => {
+        expect(createAdditionExercise).toHaveBeenNthCalledWith(2, "MEDIUM");
+    });
+
+    // Act - Sélectionner HARD pendant le chargement de MEDIUM
+    await user.click(screen.getByRole("button", { name: "1000" }));
+
+    await waitFor(() => {
+        expect(createAdditionExercise).toHaveBeenNthCalledWith(3, "HARD");
+    });
+
+    // Act - La réponse HARD arrive en premier
+    resolveHard(hardExercise);
+
+    expect(await findAddition(425, 368)).toBeInTheDocument();
+
+    // Act - L'ancienne réponse MEDIUM arrive ensuite
+    resolveMedium(mediumExercise);
+
+    // Assert
+    await waitFor(() => {
+        expect(screen.getByRole("group", {name: "425 + 368 = ?",})).toBeInTheDocument();
+
+        expect(screen.queryByRole("group", {name: "25 + 68 = ?",})).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "1000" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("givenPendingNewExercise_whenChangingDifficulty_thenIgnoresOldResponse", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const easyExercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+    const outdatedEasyExercise = {exerciseId: "456", firstOperand: 6, secondOperand: 2,};
+    const mediumExercise = {exerciseId: "789", firstOperand: 25, secondOperand: 68,};
+
+    let resolveOldRequest!: (exercise: typeof outdatedEasyExercise) => void;
+
+    const oldRequest = new Promise<typeof outdatedEasyExercise>((resolve) => {
+        resolveOldRequest = resolve;
+    });
+
+    vi.mocked(createAdditionExercise)
+        .mockResolvedValueOnce(easyExercise)
+        .mockReturnValueOnce(oldRequest)
+        .mockResolvedValueOnce(mediumExercise);
+
+    vi.mocked(checkAdditionAnswer).mockResolvedValue(true);
+
+    render(<AdditionExerciseContainer />);
+
+    expect(await findAddition(3, 8)).toBeInTheDocument();
+
+    // Répondre correctement
+    await user.type(screen.getByRole("spinbutton"), "11");
+    await user.click(screen.getByRole("button", { name: "Vérifier" }));
+
+    expect(await screen.findByText("Bravo! Bonne réponse!")).toBeInTheDocument();
+
+    // Lancer une nouvelle addition EASY
+    await user.click(screen.getByRole("button", { name: "Nouvelle addition" }));
+
+    await waitFor(() => {
+        expect(createAdditionExercise).toHaveBeenCalledTimes(2);
+    });
+
+    // Changer vers MEDIUM pendant la requête EASY
+    await user.click(screen.getByRole("button", { name: "100" }));
+
+    expect(await findAddition(25, 68)).toBeInTheDocument();
+
+    // Act - L'ancienne requête EASY se termine après MEDIUM
+    await act(async () => {
+        resolveOldRequest(outdatedEasyExercise);
+    });
+
+    // Assert - L'exercice MEDIUM doit rester affiché
+    expect(screen.getByRole("group", {name: "25 + 68 = ?",})).toBeInTheDocument();
+    expect(screen.queryByRole("group", {name: "6 + 2 = ?",})).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "100" })).toHaveAttribute("aria-pressed", "true");
+    expect(createAdditionExercise).toHaveBeenNthCalledWith(3, "MEDIUM");
 });

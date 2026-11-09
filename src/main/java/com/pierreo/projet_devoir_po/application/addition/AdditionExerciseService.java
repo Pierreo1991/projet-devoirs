@@ -1,6 +1,7 @@
 package com.pierreo.projet_devoir_po.application.addition;
 
 import com.pierreo.projet_devoir_po.application.addition.exception.AdditionExerciseNotFoundException;
+import com.pierreo.projet_devoir_po.domain.addition.AdditionDifficulty;
 import com.pierreo.projet_devoir_po.domain.addition.AdditionExercise;
 import com.pierreo.projet_devoir_po.domain.addition.AdditionExerciseGenerator;
 import com.pierreo.projet_devoir_po.domain.addition.AdditionExerciseRepository;
@@ -15,17 +16,17 @@ public class AdditionExerciseService {
     private final AdditionExerciseRepository repository;
 
     public CreatedAdditionExercise createExercise() {
-        AdditionExercise exercise = generator.generate();
+        return createExercise(AdditionDifficulty.EASY);
+    }
+
+    public CreatedAdditionExercise createExercise(AdditionDifficulty difficulty) {
+        AdditionExercise exercise = generator.generate(difficulty);
 
         UUID exerciseId = UUID.randomUUID();
 
         repository.save(exerciseId, exercise);
 
-        return new CreatedAdditionExercise(
-                exerciseId,
-                exercise.getFirstOperand(),
-                exercise.getSecondOperand()
-        );
+        return new CreatedAdditionExercise(exerciseId, exercise.getFirstOperand(), exercise.getSecondOperand());
     }
 
     public boolean checkAnswer(UUID exerciseId, int answer) {
