@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, vi, test } from "vitest";
 import { AdditionPage } from "./AdditionPage";
+import type { AdditionDifficulty } from "../types/AdditionDifficulty";
 
 test("givenAdditionExercise_whenRenderingPage_thenDisplaysOperands", () => {
     // Arrange
@@ -51,4 +52,25 @@ test("givenCorrectAnswer_whenRenderingPage_thenHidesAnswerForm", () => {
     expect(screen.getByRole("button", { name: "Nouvelle addition" })).toBeInTheDocument();
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Vérifier" })).not.toBeInTheDocument();
+});
+
+test("givenEasyDifficulty_whenSelectingMedium_thenCallsDifficultyChangeHandler", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const onDifficultyChange = vi.fn<(difficulty: AdditionDifficulty) => void>();
+    const exercise = {exerciseId: "123", firstOperand: 3, secondOperand: 8,};
+
+    render(
+        <AdditionPage
+            exercise={exercise}
+            difficulty="EASY"
+            onDifficultyChange={onDifficultyChange}
+        />
+    );
+
+    // Act
+    await user.click(screen.getByRole("button", { name: "100" }));
+
+    // Assert
+    expect(onDifficultyChange).toHaveBeenCalledExactlyOnceWith("MEDIUM");
 });

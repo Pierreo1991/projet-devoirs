@@ -3,6 +3,7 @@ package com.pierreo.projet_devoir_po.api.addition;
 import com.pierreo.projet_devoir_po.application.addition.AdditionExerciseService;
 import com.pierreo.projet_devoir_po.application.addition.CreatedAdditionExercise;
 import com.pierreo.projet_devoir_po.application.addition.exception.AdditionExerciseNotFoundException;
+import com.pierreo.projet_devoir_po.domain.addition.AdditionDifficulty;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -13,8 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -35,7 +35,7 @@ class AdditionExerciseResourceTest {
 
         CreatedAdditionExercise exercise = new CreatedAdditionExercise(exerciseId, 3, 8);
 
-        when(service.createExercise()).thenReturn(exercise);
+        when(service.createExercise(AdditionDifficulty.EASY)).thenReturn(exercise);
 
         // Act & Assert
         mockMvc.perform(post("/api/additions"))
@@ -43,6 +43,8 @@ class AdditionExerciseResourceTest {
                 .andExpect(jsonPath("$.exerciseId").value(exerciseId.toString()))
                 .andExpect(jsonPath("$.firstOperand").value(3))
                 .andExpect(jsonPath("$.secondOperand").value(8));
+
+        verify(service).createExercise(AdditionDifficulty.EASY);
     }
 
     @Test
@@ -108,5 +110,37 @@ class AdditionExerciseResourceTest {
                 .andExpect(status().isNotFound());
 
         verify(service).checkAnswer(exerciseId, 11);
+    }
+
+    @Test
+    void givenMediumDifficulty_whenCreatingExercise_thenReturnsMediumExercise()
+            throws Exception {
+        // Arrange
+        UUID exerciseId = UUID.randomUUID();
+
+        CreatedAdditionExercise exercise = new CreatedAdditionExercise(exerciseId, 25, 100);
+
+        when(service.createExercise(AdditionDifficulty.MEDIUM)).thenReturn(exercise);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/additions")
+                        .param("difficulty", "MEDIUM"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.exerciseId").value(exerciseId.toString()))
+                .andExpect(jsonPath("$.firstOperand").value(25))
+                .andExpect(jsonPath("$.secondOperand").value(100));
+
+        verify(service).createExercise(AdditionDifficulty.MEDIUM);
+    }
+
+    @Test
+    void givenInvalidDifficulty_whenCreatingExercise_thenReturnsBadRequest()
+            throws Exception {
+        // Act & Assert
+        mockMvc.perform(post("/api/additions")
+                        .param("difficulty", "IMPOSSIBLE"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(service);
     }
 }

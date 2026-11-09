@@ -1,34 +1,39 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AdditionPage } from "../pages/AdditionPage";
 import {
     createAdditionExercise,
     checkAdditionAnswer,
 } from "../services/additionApi";
 import type { AdditionExercise } from "../types/AdditionExercise";
+import type { AdditionDifficulty } from "../types/AdditionDifficulty";
 
 export function AdditionExerciseContainer() {
     const [exercise, setExercise] = useState<AdditionExercise | null>(null);
+    const [difficulty, setDifficulty] = useState<AdditionDifficulty>("EASY");
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
     const [isChecking, setIsChecking] = useState(false);
 
+    const requestIdRef = useRef(0);
+
     useEffect(() => {
         let active = true;
+        const requestId = ++requestIdRef.current;
 
         async function loadExercise() {
             try {
-                const generatedExercise = await createAdditionExercise();
+                const generatedExercise = await createAdditionExercise(difficulty);
 
-                if (active) {
+                if (active && requestId === requestIdRef.current) {
                     setExercise(generatedExercise);
                 }
             } catch {
-                if (active) {
+                if (active && requestId === requestIdRef.current) {
                     setError("Impossible de charger l'exercice.");
                 }
             } finally {
-                if (active) {
+                if (active && requestId === requestIdRef.current) {
                     setIsLoading(false);
                 }
             }
@@ -37,7 +42,7 @@ export function AdditionExerciseContainer() {
         void loadExercise();
 
         return () => {active = false;};
-    }, []);
+    }, [difficulty]);
 
     async function handleSubmitAnswer(answer: number) {
         if (!exercise || isChecking || isCorrect === true || isLoading) {
@@ -49,7 +54,6 @@ export function AdditionExerciseContainer() {
 
         try {
             const result = await checkAdditionAnswer(exercise.exerciseId, answer);
-
             setIsCorrect(result);
         } catch {
             setError("Impossible de vérifier la réponse.");
@@ -67,26 +71,47 @@ export function AdditionExerciseContainer() {
             return;
         }
 
+        const requestId = ++requestIdRef.current;
+
         setIsLoading(true);
         setError(null);
 
         try {
-            const generatedExercise = await createAdditionExercise();
+            const generatedExercise = await createAdditionExercise(difficulty);
 
-            setExercise(generatedExercise);
-            setIsCorrect(null);
+            if (requestId === requestIdRef.current) {
+                setExercise(generatedExercise);
+                setIsCorrect(null);
+            }
         } catch {
-            setError("Impossible de charger un nouvel exercice.");
+            if (requestId === requestIdRef.current) {
+                setError("Impossible de charger un nouvel exercice.");
+            }
         } finally {
-            setIsLoading(false);
+            if (requestId === requestIdRef.current) {
+                setIsLoading(false);
+            }
         }
     }
 
-    if (isLoading) {
-        return <p>Chargement de l'exercice...</p>;
+    function handleDifficultyChange(newDifficulty: AdditionDifficulty) {
+        if (newDifficulty === difficulty || isChecking) {
+            return;
+        }
+
+        ++requestIdRef.current;
+
+        setIsLoading(true);
+        setError(null);
+        setIsCorrect(null);
+        setDifficulty(newDifficulty);
     }
 
     if (!exercise) {
+        if (isLoading) {
+            return <p>Chargement de l'exercice...</p>;
+        }
+
         return <p role="alert">{error ?? "Aucun exercice disponible."}</p>;
     }
 
@@ -95,11 +120,14 @@ export function AdditionExerciseContainer() {
             <AdditionPage
                 key={exercise.exerciseId}
                 exercise={exercise}
+                difficulty={difficulty}
+                onDifficultyChange={handleDifficultyChange}
                 onSubmitAnswer={handleSubmitAnswer}
                 onAnswerChange={handleAnswerChange}
                 onNewExercise={handleNewExercise}
                 isCorrect={isCorrect}
                 isChecking={isChecking}
+                isLoading={isLoading}
             />
 
             {error && <p role="alert">{error}</p>}
